@@ -45,38 +45,46 @@ async def generate_content(
         if extra:
             prompt_text += f" Extra info: {extra}."
 
-        api_key = os.environ.get("GEMINI_API_KEY", "").strip()
-        url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+        api_key = os.environ.get("OPENROUTER_API_KEY", "").strip()
 
         payload = {
-            "contents": [{
-                "parts": [
-                    {"text": prompt_text},
-                    {
-                        "inline_data": {
-                            "mime_type": mime_type,
-                            "data": image_b64
+            "model": "google/gemini-2.0-flash-exp:free",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": prompt_text
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:{mime_type};base64,{image_b64}"
+                            }
                         }
-                    }
-                ]
-            }],
-            "generationConfig": {
-                "temperature": 0.4,
-                "maxOutputTokens": 1500
-            }
+                    ]
+                }
+            ]
         }
 
         headers = {
+            "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
-            "x-goog-api-key": api_key
+            "HTTP-Referer": "https://xenova.com.tr",
+            "X-Title": "Trendyol Urun Asistani"
         }
 
         async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.post(url, json=payload, headers=headers)
+            response = await client.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                json=payload,
+                headers=headers
+            )
             response.raise_for_status()
             data = response.json()
 
-        text = data["candidates"][0]["content"]["parts"][0]["text"]
+        text = data["choices"][0]["message"]["content"]
         text = text.strip().replace("```json", "").replace("```", "").strip()
         result = json.loads(text)
         return result
@@ -84,7 +92,7 @@ async def generate_content(
     except json.JSONDecodeError:
         raise HTTPException(status_code=500, detail="AI yaniti parse edilemedi.")
     except httpx.HTTPStatusError as e:
-        raise HTTPException(status_code=500, detail=f"Gemini API hatasi: {e.response.text}")
+        raise HTTPException(status_code=500, detail=f"API hatasi: {e.response.text}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
