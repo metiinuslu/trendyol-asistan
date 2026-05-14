@@ -45,7 +45,7 @@ async def generate_content(
         if extra:
             prompt_text += f" Extra info: {extra}."
 
-        api_key = os.environ.get("GEMINI_API_KEY")
+        api_key = os.environ.get("GEMINI_API_KEY", "").strip()
         url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
 
         payload = {
