@@ -48,7 +48,7 @@ async def generate_content(
         api_key = os.environ.get("OPENROUTER_API_KEY", "").strip()
 
         payload = {
-            "model": "google/gemini-2.5-flash-preview:free",
+            "model": "openrouter/auto",
             "messages": [
                 {
                     "role": "user",
