@@ -6,7 +6,7 @@ from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-app = FastAPI(title="Trendyol Ürün Asistanı")
+app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
@@ -15,13 +15,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-PROMPT = """Sen Trendyol platformu için uzman bir ürün içerik yazarısın. Bu ürün görselini analiz et ve aşağıdaki formatta SADECE JSON döndür. Başka hiçbir şey yazma, markdown backtick kullanma.
-
-{
-  "title": "Trendyol SEO uyumlu ürün başlığı (60-80 karakter, ürün türü + özellik + renk/beden formatında)",
-  "description": "Ürün açıklaması (detaylı, bullet point tarzında, ürün özellikleri, malzeme, kullanım alanı, avantajlar. Trendyol alıcısına hitap etsin.)",
-  "keywords": ["anahtar", "kelime", "listesi", "en az 8 adet"]
-}"""
+PROMPT = (
+    "You are an expert product content writer for Trendyol Turkey marketplace. "
+    "Analyze this product image carefully. "
+    "Return ONLY a valid JSON object with NO markdown, NO backticks, NO extra text. "
+    "The JSON must have these exact keys: title, description, keywords. "
+    "title: SEO-optimized Turkish product title (60-80 chars). "
+    "description: Detailed Turkish description with bullet points about features, material, usage, advantages. "
+    "keywords: array of minimum 8 Turkish search keywords."
+)
 
 @app.post("/api/generate")
 async def generate_content(
@@ -32,19 +34,19 @@ async def generate_content(
     try:
         image_bytes = await image.read()
         if len(image_bytes) > 10 * 1024 * 1024:
-            raise HTTPException(status_code=400, detail="Görsel 10MB'dan büyük olamaz.")
+            raise HTTPException(status_code=400, detail="Gorsel 10MB dan buyuk olamaz.")
 
         image_b64 = base64.b64encode(image_bytes).decode("utf-8")
         mime_type = image.content_type or "image/jpeg"
 
         prompt_text = PROMPT
         if category:
-            prompt_text += f"\n\nKategori: {category}"
+            prompt_text += f" Category: {category}."
         if extra:
-            prompt_text += f"\nEk bilgi: {extra}"
+            prompt_text += f" Extra info: {extra}."
 
         api_key = os.environ.get("GEMINI_API_KEY")
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+        url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
 
         payload = {
             "contents": [{
@@ -64,8 +66,13 @@ async def generate_content(
             }
         }
 
+        headers = {
+            "Content-Type": "application/json",
+            "x-goog-api-key": api_key
+        }
+
         async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.post(url, json=payload)
+            response = await client.post(url, json=payload, headers=headers)
             response.raise_for_status()
             data = response.json()
 
@@ -75,9 +82,9 @@ async def generate_content(
         return result
 
     except json.JSONDecodeError:
-        raise HTTPException(status_code=500, detail="AI yanıtı parse edilemedi.")
+        raise HTTPException(status_code=500, detail="AI yaniti parse edilemedi.")
     except httpx.HTTPStatusError as e:
-        raise HTTPException(status_code=500, detail=f"Gemini API hatası: {e.response.text}")
+        raise HTTPException(status_code=500, detail=f"Gemini API hatasi: {e.response.text}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
